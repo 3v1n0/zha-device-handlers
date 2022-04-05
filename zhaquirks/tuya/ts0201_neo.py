@@ -1,5 +1,7 @@
 """Neo Tuya Temperature, Humidity and Illumination Sensor."""
 
+import asyncio
+
 from zigpy.profiles import zha
 from zigpy.profiles.zha import DeviceType
 from zigpy.quirks import CustomCluster, CustomDevice
@@ -101,3 +103,21 @@ class TemperatureHumidtyIlluminanceSensor(CustomDevice):
             },
         },
     }
+
+    def __init__(self, *args, **kwargs):
+        """Initialize with magic task."""
+        super().__init__(*args, **kwargs)
+
+        self._init_sensor_task = asyncio.create_task(self.spell())
+
+    async def spell(self) -> None:
+        """Initialize device so that all endpoints become available."""
+        basic_cluster = self.endpoints[1].in_clusters[Basic.cluster_id]
+
+        # From https://github.com/zigpy/zigpy/blob/master/zigpy/zcl/clusters/general.py
+        # 4 manufactureur, 0, zcl_version, 1 app_version, 5 model, 7 power source
+        # From https://github.com/Koenkk/zigbee2mqtt/issues/9057#issuecomment-1007742130
+        # 0xfffe, attributeReportingStatus
+        attr_to_read = [4, 0, 1, 5, 7, 0xFFFE]
+        await basic_cluster.read_attributes(attr_to_read)
+        _LOGGER.debug("Device class is casting Tuya Magic Spell")
